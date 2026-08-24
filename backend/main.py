@@ -4,6 +4,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 import base64
+import json
 
 load_dotenv()
 
@@ -18,6 +19,12 @@ app.add_middleware(
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+SYSTEM_PROMPT = (
+    "You are GenAI App, a helpful assistant built as a student portfolio project. "
+    "You can hold normal conversations and analyze images the user uploads. "
+    "Be concise, clear, and honest — if you're unsure about something, say so rather than guessing."
+)
+
 @app.get("/")
 def home():
     return {"message": "Backend is running!"}
@@ -26,34 +33,47 @@ def home():
 async def chat(request: Request):
     data = await request.json()
     user_input = data.get("prompt", "")
+    history = data.get("history", [])  # [{role, content}, ...] from the frontend
+
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages.extend(history)
+    messages.append({"role": "user", "content": user_input})
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role": "user", "content": user_input}]
+        messages=messages,
     )
 
     return {"response": response.choices[0].message.content}
 
 @app.post("/chat-with-image")
-async def chat_with_image(prompt: str = Form(...), image: UploadFile = File(...)):
-    # Read the uploaded image bytes and encode as base64
+async def chat_with_image(
+    prompt: str = Form(...),
+    image: UploadFile = File(...),
+    history: str = Form("[]"),  # JSON string, since multipart can't send raw JSON
+):
     image_bytes = await image.read()
     base64_image = base64.b64encode(image_bytes).decode("utf-8")
-
-    # Build the data URL GPT-4o-mini expects
     data_url = f"data:{image.content_type};base64,{base64_image}"
+
+    try:
+        parsed_history = json.loads(history)
+    except json.JSONDecodeError:
+        parsed_history = []
+
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages.extend(parsed_history)
+    messages.append({
+        "role": "user",
+        "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": data_url}},
+        ],
+    })
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": data_url}},
-                ],
-            }
-        ],
+        messages=messages,
     )
 
     return {"response": response.choices[0].message.content}

@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import "./App.css";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const BACKEND_URL = "http://127.0.0.1:8000";
-const NAME_KEY = "genai_app_username";
 const CHATS_KEY = "genai_app_chats";
 
 const SUGGESTIONS = [
@@ -110,6 +111,72 @@ function NamePrompt({ onSubmit }) {
   );
 }
 
+function Composer({
+  hero,
+  prompt,
+  setPrompt,
+  imagePreview,
+  clearImage,
+  fileInputRef,
+  handleImageChange,
+  handleSubmit,
+  handleKeyDown,
+  loading,
+}) {
+  return (
+    <form className={`composer ${hero ? "hero-composer" : ""}`} onSubmit={handleSubmit}>
+      <div className="composer-box">
+        {imagePreview && (
+          <div className="attachment-preview">
+            <img src={imagePreview} alt="preview" />
+            <button type="button" className="remove-attachment" onClick={clearImage}>
+              ×
+            </button>
+          </div>
+        )}
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Message GenAI App"
+          rows={1}
+          autoFocus={hero}
+        />
+        <div className="composer-toolbar">
+          <button
+            type="button"
+            className="tool-btn round"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach image"
+          >
+            <Icon name="plus" size={18} />
+          </button>
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            onChange={handleImageChange}
+            style={{ display: "none" }}
+          />
+          <button type="button" className="tool-btn text">
+            Smart <Icon name="chevron" size={14} />
+          </button>
+          <div className="toolbar-spacer" />
+          {prompt.trim() ? (
+            <button type="submit" className="send-button" disabled={loading}>
+              <Icon name="arrow-up" size={18} />
+            </button>
+          ) : (
+            <button type="button" className="tool-btn round voice" title="Voice">
+              <Icon name="voice" size={18} />
+            </button>
+          )}
+        </div>
+      </div>
+    </form>
+  );
+}
+
 function App() {
   const [userName, setUserName] = useState(null);
   const [prompt, setPrompt] = useState("");
@@ -122,8 +189,6 @@ function App() {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem(NAME_KEY);
-    if (stored) setUserName(stored);
     try {
       const storedChats = JSON.parse(localStorage.getItem(CHATS_KEY) || "[]");
       if (Array.isArray(storedChats)) setChats(storedChats);
@@ -137,7 +202,6 @@ function App() {
   }, [chats]);
 
   const handleNameSubmit = (name) => {
-    localStorage.setItem(NAME_KEY, name);
     setUserName(name);
   };
 
@@ -197,7 +261,8 @@ function App() {
     if (!prompt.trim()) return;
 
     const userMessage = { role: "user", text: prompt, image: imagePreview };
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setLoading(true);
 
     const currentPrompt = prompt;
@@ -205,17 +270,27 @@ function App() {
     setPrompt("");
     clearImage();
 
+    // Build history from everything BEFORE this new message, text-only
+    const history = messages.map((m) => ({
+      role: m.role,
+      content: m.text,
+    }));
+
     try {
       let res;
       if (currentImage) {
         const formData = new FormData();
         formData.append("prompt", currentPrompt);
         formData.append("image", currentImage);
+        formData.append("history", JSON.stringify(history));
         res = await axios.post(`${BACKEND_URL}/chat-with-image`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       } else {
-        res = await axios.post(`${BACKEND_URL}/chat`, { prompt: currentPrompt });
+        res = await axios.post(`${BACKEND_URL}/chat`, {
+          prompt: currentPrompt,
+          history,
+        });
       }
 
       setMessages((prev) => [...prev, { role: "assistant", text: res.data.response }]);
@@ -237,64 +312,21 @@ function App() {
     }
   };
 
-  const Composer = ({ hero }) => (
-    <form className={`composer ${hero ? "hero-composer" : ""}`} onSubmit={handleSubmit}>
-      {imagePreview && (
-        <div className="attachment-preview">
-          <img src={imagePreview} alt="preview" />
-          <button type="button" className="remove-attachment" onClick={clearImage}>
-            ×
-          </button>
-        </div>
-      )}
-      <div className="composer-box">
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Message GenAI App"
-          rows={1}
-          autoFocus={hero}
-        />
-        <div className="composer-toolbar">
-          <button
-            type="button"
-            className="tool-btn round"
-            onClick={() => fileInputRef.current?.click()}
-            title="Attach image"
-          >
-            <Icon name="plus" size={18} />
-          </button>
-          <input
-            type="file"
-            accept="image/*"
-            ref={fileInputRef}
-            onChange={handleImageChange}
-            style={{ display: "none" }}
-          />
-          <button type="button" className="tool-btn text">
-            Smart <Icon name="chevron" size={14} />
-          </button>
-          <div className="toolbar-spacer" />
-          {prompt.trim() ? (
-            <button type="submit" className="send-button" disabled={loading}>
-              <Icon name="arrow-up" size={18} />
-            </button>
-          ) : (
-            <button type="button" className="tool-btn round voice" title="Voice">
-              <Icon name="voice" size={18} />
-            </button>
-          )}
-        </div>
-      </div>
-    </form>
-  );
-
   if (!userName) {
     return <NamePrompt onSubmit={handleNameSubmit} />;
   }
 
-  const initials = userName.slice(0, 2).toUpperCase();
+  const composerProps = {
+    prompt,
+    setPrompt,
+    imagePreview,
+    clearImage,
+    fileInputRef,
+    handleImageChange,
+    handleSubmit,
+    handleKeyDown,
+    loading,
+  };
 
   return (
     <div className="app-shell">
@@ -328,16 +360,6 @@ function App() {
           ))}
         </div>
 
-        <div className="sidebar-footer">
-          <div className="user-chip">
-            <div className="avatar">{initials}</div>
-            <div className="user-meta">
-              <span className="user-name">{userName}</span>
-              <span className="user-plan">Free Plan</span>
-            </div>
-          </div>
-          <button className="upgrade-btn">Upgrade</button>
-        </div>
       </aside>
 
       <main className="main">
@@ -352,7 +374,7 @@ function App() {
           <div className="hero">
             <h1>Hi {userName}, what should we dive into today?</h1>
 
-            <Composer hero />
+            <Composer hero {...composerProps} />
 
             <div className="suggestions">
               {SUGGESTIONS.map((s) => (
@@ -379,7 +401,9 @@ function App() {
                 <div key={i} className={`message-row ${msg.role}`}>
                   <div className={`bubble ${msg.role} ${msg.error ? "error" : ""}`}>
                     {msg.image && <img src={msg.image} alt="uploaded" className="bubble-image" />}
-                    <p>{msg.text}</p>
+                    <div className="markdown-content">
+  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+</div>
                   </div>
                 </div>
               ))}
@@ -395,7 +419,7 @@ function App() {
               )}
             </div>
 
-            <Composer />
+            <Composer {...composerProps} />
           </>
         )}
       </main>
