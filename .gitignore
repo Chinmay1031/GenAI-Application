@@ -1,0 +1,15 @@
+# Environment variables (NEVER commit these)
+.env
+backend/.env
+
+# Python
+backend/venv/
+backend/__pycache__/
+*.pyc
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
