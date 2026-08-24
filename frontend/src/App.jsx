@@ -3,7 +3,7 @@ import "./App.css";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-const BACKEND_URL = "http://127.0.0.1:8000";
+const BACKEND_URL = "https://genai-app-backend.onrender.com";
 const CHATS_KEY = "genai_app_chats";
 
 const SUGGESTIONS = [

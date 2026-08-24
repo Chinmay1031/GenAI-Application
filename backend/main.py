@@ -13,7 +13,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],  # TEMPORARY — replace with real Vercel URL once deployed
     allow_methods=["*"],
     allow_headers=["*"],
 )
