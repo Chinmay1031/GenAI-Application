@@ -13,7 +13,8 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TEMPORARY — replace with real Vercel URL once deployed
+    allow_origins=["https://gen-ai-application-sepia.vercel.app",
+        "http://localhost:5173",],  # TEMPORARY — replace with real Vercel URL once deployed
     allow_methods=["*"],
     allow_headers=["*"],
 )
