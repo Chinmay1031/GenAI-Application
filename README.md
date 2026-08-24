@@ -8,6 +8,14 @@ history, hero screen with suggestion chips, the usual.
 Nothing groundbreaking here — the point was to get comfortable wiring a real
 LLM into a real UI end-to-end, and to have something I can keep extending.
 
+## Live demo
+
+- **App:** https://gen-ai-application-sepia.vercel.app (frontend on Vercel)
+- **API:** https://genai-application.onrender.com (backend on Render)
+
+The Render backend is on a free tier, so the first request after a period of
+idle can take ~30s while the service wakes up. Subsequent requests are fast.
+
 ## What it does
 
 - Regular back-and-forth chat with conversation history
@@ -27,13 +35,16 @@ LLM into a real UI end-to-end, and to have something I can keep extending.
 ## Stack
 
 **Backend** — FastAPI, `openai` Python SDK, `python-dotenv`,
-`python-multipart` for image uploads. Runs on `127.0.0.1:8000`.
+`python-multipart` for image uploads. Runs on `127.0.0.1:8000` locally,
+deployed to Render.
 
 **Frontend** — React 19 + Vite, `axios` for requests, `react-markdown` +
-`remark-gfm` for rendering. Runs on `localhost:5173`.
+`remark-gfm` for rendering. Runs on `localhost:5173` locally, deployed to
+Vercel.
 
-The backend has CORS pinned to the Vite dev origin, so if you change either
-port you'll want to update the other side too.
+The backend has CORS pinned to the deployed Vercel origin, so for local
+development you'll want to add `http://localhost:5173` to the allowed origins
+in `backend/main.py`.
 
 ## Running it locally
 
