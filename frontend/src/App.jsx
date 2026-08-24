@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import axios from "axios";
 import "./App.css";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -261,8 +260,7 @@ function App() {
     if (!prompt.trim()) return;
 
     const userMessage = { role: "user", text: prompt, image: imagePreview };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    setMessages([...messages, userMessage]);
     setLoading(true);
 
     const currentPrompt = prompt;
@@ -283,17 +281,43 @@ function App() {
         formData.append("prompt", currentPrompt);
         formData.append("image", currentImage);
         formData.append("history", JSON.stringify(history));
-        res = await axios.post(`${BACKEND_URL}/chat-with-image`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
+        res = await fetch(`${BACKEND_URL}/chat-with-image`, {
+          method: "POST",
+          body: formData,
         });
       } else {
-        res = await axios.post(`${BACKEND_URL}/chat`, {
-          prompt: currentPrompt,
-          history,
+        res = await fetch(`${BACKEND_URL}/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: currentPrompt, history }),
         });
       }
 
-      setMessages((prev) => [...prev, { role: "assistant", text: res.data.response }]);
+      if (!res.ok || !res.body) throw new Error(`Request failed: ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      let started = false;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        if (!chunk) continue;
+        accumulated += chunk;
+        if (!started) {
+          started = true;
+          setLoading(false);
+          setMessages((prev) => [...prev, { role: "assistant", text: accumulated }]);
+        } else {
+          setMessages((prev) => {
+            const next = [...prev];
+            next[next.length - 1] = { role: "assistant", text: accumulated };
+            return next;
+          });
+        }
+      }
     } catch (err) {
       console.error(err);
       setMessages((prev) => [

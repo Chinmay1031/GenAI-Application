@@ -11,6 +11,8 @@ LLM into a real UI end-to-end, and to have something I can keep extending.
 ## What it does
 
 - Regular back-and-forth chat with conversation history
+- Streaming replies — text appears token-by-token as the model writes it,
+  same feel as ChatGPT / Claude
 - Image upload — attach a picture and ask questions about it (uses the vision
   side of `gpt-4o-mini`)
 - Markdown rendering in assistant replies, tables and all (`react-markdown` +
@@ -114,7 +116,10 @@ Two endpoints, both POST:
 **`/chat-with-image`** — `multipart/form-data` with `prompt`, `image`, and
 `history` (JSON-encoded string, since multipart can't carry raw JSON).
 
-Both return `{ "response": "..." }`.
+Both return a `text/plain` stream of the assistant's reply — chunks of raw
+text as OpenAI produces them. The frontend reads the stream with
+`response.body.getReader()` and appends each chunk to the assistant bubble
+as it arrives.
 
 History is sent from the frontend on every request — the backend is
 stateless, which keeps things simple and lets the sidebar own the notion of
@@ -124,8 +129,8 @@ stateless, which keeps things simple and lets the sidebar own the notion of
 
 - Model is hardcoded to `gpt-4o-mini` in `backend/main.py`. Easy to swap, but
   I haven't wired it up as a setting yet.
-- No streaming — replies come back in one shot. The thinking-dots animation
-  covers the wait. Streaming is on the list.
+- Markdown mid-stream can look briefly odd — a half-written code fence, an
+  unclosed `**bold`. It settles the moment the stream finishes.
 - Chats live in `localStorage` only. No backend persistence, no accounts.
 - The `Smart` dropdown in the composer toolbar is a placeholder — doesn't
   do anything yet.
@@ -133,9 +138,9 @@ stateless, which keeps things simple and lets the sidebar own the notion of
 
 ## What's next (roughly)
 
-- Streaming responses
 - Model picker
 - Delete / rename chats from the sidebar
+- Stop button to cancel a streaming reply mid-flight
 - Probably a proper user record on the backend once I add auth
 
 ---

@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
@@ -29,6 +30,18 @@ SYSTEM_PROMPT = (
 def home():
     return {"message": "Backend is running!"}
 
+def stream_completion(messages):
+    stream = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages,
+        stream=True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
+
+
 @app.post("/chat")
 async def chat(request: Request):
     data = await request.json()
@@ -39,12 +52,7 @@ async def chat(request: Request):
     messages.extend(history)
     messages.append({"role": "user", "content": user_input})
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-    )
-
-    return {"response": response.choices[0].message.content}
+    return StreamingResponse(stream_completion(messages), media_type="text/plain")
 
 @app.post("/chat-with-image")
 async def chat_with_image(
@@ -71,9 +79,4 @@ async def chat_with_image(
         ],
     })
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-    )
-
-    return {"response": response.choices[0].message.content}
+    return StreamingResponse(stream_completion(messages), media_type="text/plain")
